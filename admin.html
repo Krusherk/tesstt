@@ -535,7 +535,7 @@
         let loggedIn = false;
 
         // Login
-        window.login = () => {
+        window.login = function() {
             if (document.getElementById('pass').value === 'qowiyykareem') {
                 loggedIn = true;
                 document.getElementById('loginBox').style.display = 'none';
@@ -547,7 +547,7 @@
             }
         };
 
-        window.logout = () => {
+        window.logout = function() {
             loggedIn = false;
             document.getElementById('loginBox').style.display = 'block';
             document.getElementById('adminPanel').classList.remove('active');
