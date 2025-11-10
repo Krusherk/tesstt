@@ -566,6 +566,7 @@
                 updateStats();
                 renderTable();
             } catch (e) {
+                console.error('Load error:', e);
                 showToast('Error loading projects');
                 document.getElementById('tbody').innerHTML = '<tr><td colspan="6" class="empty">Error loading</td></tr>';
             }
@@ -632,13 +633,18 @@
         };
 
         window.handleSave = async function() {
+            alert('Save function called!');
             console.log('Save button clicked');
             
             const name = document.getElementById('name').value;
             const description = document.getElementById('description').value;
             const category = document.getElementById('category').value;
             
+            console.log('Name:', name);
+            console.log('Description:', description);
+            
             if (!name || !description) {
+                alert('Please fill in required fields');
                 showToast('Please fill in required fields');
                 return;
             }
@@ -647,9 +653,9 @@
                 name: name,
                 description: description,
                 category: category,
-                logo: document.getElementById('logo').value,
-                website: document.getElementById('website').value,
-                twitter: document.getElementById('twitter').value,
+                logo: document.getElementById('logo').value || '',
+                website: document.getElementById('website').value || '',
+                twitter: document.getElementById('twitter').value || '',
             };
 
             console.log('Data to save:', data);
@@ -660,16 +666,20 @@
                 if (id) {
                     console.log('Updating project:', id);
                     await updateDoc(doc(db, "projects", id), data);
+                    alert('Project updated!');
                     showToast('Project updated!');
                 } else {
                     console.log('Adding new project');
-                    await addDoc(collection(db, "projects"), data);
+                    const docRef = await addDoc(collection(db, "projects"), data);
+                    console.log('Document added with ID:', docRef.id);
+                    alert('Project added successfully!');
                     showToast('Project added!');
                 }
                 await load();
                 hideForm();
             } catch (error) {
                 console.error('Error saving:', error);
+                alert('Error: ' + error.message);
                 showToast('Error: ' + error.message);
             }
         };
