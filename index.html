@@ -115,6 +115,11 @@
             -webkit-text-fill-color: transparent;
         }
 
+        .nav-btns {
+            display: flex;
+            gap: 12px;
+        }
+
         .submit-btn {
             padding: 12px 24px;
             background: rgba(139, 92, 246, 0.1);
@@ -125,6 +130,8 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
         }
 
         .submit-btn:hover {
@@ -433,57 +440,10 @@
             border: 1px solid rgba(139, 92, 246, 0.3);
         }
 
-        .btn-del {
-            background: linear-gradient(135deg, #dc2626, #991b1b);
-        }
-
         .btn-group {
             display: flex;
             gap: 12px;
             margin-top: 24px;
-        }
-
-        .admin-nav {
-            display: flex;
-            gap: 14px;
-            margin-bottom: 36px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 18px;
-            text-align: left;
-            border-bottom: 1px solid rgba(139, 92, 246, 0.08);
-        }
-
-        th {
-            font-size: 11px;
-            font-weight: 700;
-            color: rgba(139, 92, 246, 0.8);
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-        }
-
-        td {
-            font-size: 14px;
-        }
-
-        tr:hover {
-            background: rgba(139, 92, 246, 0.03);
-        }
-
-        .acts {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn-sm {
-            padding: 7px 14px;
-            font-size: 12px;
         }
 
         .empty {
@@ -499,10 +459,28 @@
             font-size: 16px;
         }
 
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            background: rgba(15, 15, 15, 0.95);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            padding: 20px 24px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
         @media (max-width: 768px) {
-            h1 { font-size: 2.5rem; }
             .grid { grid-template-columns: 1fr; }
             .modal-box { padding: 28px; }
+            .nav-btns { flex-direction: column; gap: 8px; }
         }
     </style>
 </head>
@@ -538,6 +516,7 @@
         </div>
     </div>
 
+    <!-- Submit Modal -->
     <div class="modal" id="modal">
         <div class="modal-box">
             <div class="modal-head">
@@ -593,12 +572,13 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, get, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCt-I2vo7_OOCokCoHIUV_caNxsFJpEPqM",
             authDomain: "nadiscovery-c43aa.firebaseapp.com",
+            databaseURL: "https://nadiscovery-c43aa-default-rtdb.firebaseio.com",
             projectId: "nadiscovery-c43aa",
             storageBucket: "nadiscovery-c43aa.firebasestorage.app",
             messagingSenderId: "1060132821025",
@@ -607,7 +587,7 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const db = getDatabase(app);
 
         let projects = [];
         let currentCat = 'all';
@@ -632,21 +612,35 @@
                 name: document.getElementById('reqName').value,
                 description: document.getElementById('reqDescription').value,
                 category: document.getElementById('reqCategory').value,
-                website: document.getElementById('reqWebsite').value,
-                twitter: document.getElementById('reqTwitter').value,
+                website: document.getElementById('reqWebsite').value || '',
+                twitter: document.getElementById('reqTwitter').value || '',
                 email: document.getElementById('reqEmail').value,
                 status: 'pending',
-                submittedAt: new Date().toISOString()
+                submittedAt: Date.now()
             };
 
             try {
-                await addDoc(collection(db, "submissions"), data);
-                alert('Thank you! Your project has been submitted for review.');
+                const submissionsRef = ref(db, 'submissions');
+                const newSubmissionRef = push(submissionsRef);
+                await set(newSubmissionRef, data);
+                
+                showToast('Thank you! Your project has been submitted for review.');
                 closeSubmitModal();
             } catch (e) {
-                alert('Error submitting. Please try again.');
+                console.error('Submission error:', e);
+                showToast('Error submitting. Please try again.');
             }
         };
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Three.js Scene
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), alpha: true });
@@ -681,23 +675,42 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Load
+        // Load projects from Realtime Database
         async function load() {
             try {
-                const snap = await getDocs(collection(db, "projects"));
+                const projectsRef = ref(db, 'projects');
+                const snapshot = await get(projectsRef);
+                
                 projects = [];
-                snap.forEach(d => projects.push({ id: d.id, ...d.data() }));
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    Object.keys(data).forEach(key => {
+                        projects.push({ id: key, ...data[key] });
+                    });
+                }
+                
                 render();
                 renderCats();
                 console.log('Loaded', projects.length, 'projects');
             } catch (e) {
                 console.error('Load error:', e);
-                document.getElementById('grid').innerHTML = '<div class="empty">Error loading</div>';
+                document.getElementById('grid').innerHTML = '<div class="empty">Error loading projects</div>';
             }
         }
 
-        // Auto-refresh every 30 seconds
-        setInterval(load, 30000);
+        // Real-time listener (optional - for live updates)
+        const projectsRef = ref(db, 'projects');
+        onValue(projectsRef, (snapshot) => {
+            projects = [];
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                Object.keys(data).forEach(key => {
+                    projects.push({ id: key, ...data[key] });
+                });
+            }
+            render();
+            renderCats();
+        });
 
         function render() {
             const search = document.getElementById('search').value.toLowerCase();
@@ -747,126 +760,7 @@
 
         window.filter = render;
 
-        // Modal
-        window.openModal = () => document.getElementById('modal').classList.add('show');
-        window.closeModal = () => {
-            document.getElementById('modal').classList.remove('show');
-            if (loggedIn) logout();
-        };
-
-        // Auth
-        window.login = () => {
-            if (document.getElementById('pass').value === 'qowiyykareem') {
-                loggedIn = true;
-                document.getElementById('login').style.display = 'none';
-                document.getElementById('admin').style.display = 'block';
-                loadTable();
-            } else {
-                alert('Wrong password');
-            }
-        };
-
-        window.logout = () => {
-            loggedIn = false;
-            document.getElementById('login').style.display = 'block';
-            document.getElementById('admin').style.display = 'none';
-            document.getElementById('pass').value = '';
-            hideForm();
-        };
-
-        // Form
-        window.showAdd = () => {
-            document.getElementById('form').style.display = 'block';
-            document.getElementById('table').style.display = 'none';
-            document.getElementById('editId').value = '';
-            document.getElementById('name').value = '';
-            document.getElementById('description').value = '';
-            document.getElementById('category').value = 'DeFi';
-            document.getElementById('logo').value = '';
-            document.getElementById('website').value = '';
-            document.getElementById('twitter').value = '';
-        };
-
-        window.hideForm = () => {
-            document.getElementById('form').style.display = 'none';
-            document.getElementById('table').style.display = 'block';
-        };
-
-        window.save = async (e) => {
-            e.preventDefault();
-            const data = {
-                name: document.getElementById('name').value,
-                description: document.getElementById('description').value,
-                category: document.getElementById('category').value,
-                logo: document.getElementById('logo').value,
-                website: document.getElementById('website').value,
-                twitter: document.getElementById('twitter').value,
-            };
-
-            const id = document.getElementById('editId').value;
-
-            try {
-                if (id) {
-                    await updateDoc(doc(db, "projects", id), data);
-                } else {
-                    await addDoc(collection(db, "projects"), data);
-                }
-                await load();
-                loadTable();
-                hideForm();
-                alert('Saved!');
-            } catch (e) {
-                alert('Error');
-            }
-        };
-
-        window.edit = (id) => {
-            const p = projects.find(x => x.id === id);
-            if (p) {
-                document.getElementById('form').style.display = 'block';
-                document.getElementById('table').style.display = 'none';
-                document.getElementById('editId').value = p.id;
-                document.getElementById('name').value = p.name;
-                document.getElementById('description').value = p.description;
-                document.getElementById('category').value = p.category;
-                document.getElementById('logo').value = p.logo || '';
-                document.getElementById('website').value = p.website || '';
-                document.getElementById('twitter').value = p.twitter || '';
-            }
-        };
-
-        window.del = async (id) => {
-            if (confirm('Delete?')) {
-                try {
-                    await deleteDoc(doc(db, "projects", id));
-                    await load();
-                    loadTable();
-                    alert('Deleted!');
-                } catch (e) {
-                    alert('Error');
-                }
-            }
-        };
-
-        function loadTable() {
-            document.getElementById('tbody').innerHTML = projects.map(p => `
-                <tr>
-                    <td>${p.name}</td>
-                    <td>${p.category}</td>
-                    <td>
-                        ${p.website ? `<a href="${p.website}" target="_blank" style="color: #8b5cf6;">Web</a>` : '-'}
-                        ${p.twitter ? ` / <a href="${p.twitter}" target="_blank" style="color: #8b5cf6;">X</a>` : ''}
-                    </td>
-                    <td>
-                        <div class="acts">
-                            <button class="btn btn-sm" onclick="edit('${p.id}')">Edit</button>
-                            <button class="btn btn-sm btn-del" onclick="del('${p.id}')">Delete</button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
+        // Initial load
         load();
     </script>
 </body>
