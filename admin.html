@@ -604,7 +604,7 @@
         }
 
         // Search
-        window.searchProjects = () => {
+        window.searchProjects = function() {
             const search = document.getElementById('searchTable').value.toLowerCase();
             projects = allProjects.filter(p => 
                 p.name.toLowerCase().includes(search) || 
@@ -615,7 +615,7 @@
         };
 
         // Form
-        window.showForm = () => {
+        window.showForm = function() {
             document.getElementById('formContainer').classList.add('active');
             document.getElementById('formTitle').textContent = 'Add New Project';
             document.getElementById('editId').value = '';
@@ -627,12 +627,13 @@
             document.getElementById('twitter').value = '';
         };
 
-        window.hideForm = () => {
+        window.hideForm = function() {
             document.getElementById('formContainer').classList.remove('active');
         };
 
-        window.save = async (e) => {
+        window.handleSave = async function(e) {
             e.preventDefault();
+            console.log('Form submitted');
             
             const data = {
                 name: document.getElementById('name').value,
@@ -643,24 +644,31 @@
                 twitter: document.getElementById('twitter').value,
             };
 
+            console.log('Data to save:', data);
+
             const id = document.getElementById('editId').value;
 
             try {
                 if (id) {
+                    console.log('Updating project:', id);
                     await updateDoc(doc(db, "projects", id), data);
                     showToast('Project updated!');
                 } else {
+                    console.log('Adding new project');
                     await addDoc(collection(db, "projects"), data);
                     showToast('Project added!');
                 }
                 await load();
                 hideForm();
-            } catch (e) {
-                showToast('Error saving project');
+            } catch (error) {
+                console.error('Error saving:', error);
+                showToast('Error: ' + error.message);
             }
+            return false;
         };
 
-        window.edit = (id) => {
+        window.edit = function(id) {
+            console.log('Editing project:', id);
             const p = allProjects.find(x => x.id === id);
             if (p) {
                 document.getElementById('formContainer').classList.add('active');
@@ -675,14 +683,16 @@
             }
         };
 
-        window.del = async (id) => {
+        window.del = async function(id) {
+            console.log('Deleting project:', id);
             if (confirm('Are you sure you want to delete this project?')) {
                 try {
                     await deleteDoc(doc(db, "projects", id));
                     showToast('Project deleted!');
                     await load();
-                } catch (e) {
-                    showToast('Error deleting project');
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    showToast('Error: ' + error.message);
                 }
             }
         };
