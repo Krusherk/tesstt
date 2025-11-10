@@ -67,7 +67,19 @@
             width: 100%;
             height: 100%;
             z-index: 0;
-            opacity: 0.4;
+            opacity: 0.6;
+        }
+
+        .cursor-glow {
+            position: fixed;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            transition: transform 0.15s ease-out;
+            transform: translate(-50%, -50%);
         }
 
         .wrap {
@@ -480,6 +492,7 @@
     <div class="grid-bg"></div>
     <div class="glow glow-1"></div>
     <div class="glow glow-2"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
     <canvas id="canvas3d"></canvas>
 
     <div class="wrap">
@@ -632,93 +645,239 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // Three.js Scene with Mouse Interaction
+        // Advanced Three.js Scene with Enhanced Mouse Interaction
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), alpha: true });
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), alpha: true, antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
 
-        const particles = new THREE.BufferGeometry();
-        const pCount = 2000;
-        const positions = new Float32Array(pCount * 3);
-        const initialPositions = new Float32Array(pCount * 3);
+        // Create multiple particle systems with different behaviors
+        const particleSystems = [];
+        
+        // Main particle system
+        const mainParticles = new THREE.BufferGeometry();
+        const mainCount = 3000;
+        const mainPositions = new Float32Array(mainCount * 3);
+        const mainInitialPos = new Float32Array(mainCount * 3);
+        const mainVelocities = new Float32Array(mainCount * 3);
+        const mainColors = new Float32Array(mainCount * 3);
 
-        for (let i = 0; i < pCount * 3; i++) {
-            const pos = (Math.random() - 0.5) * 80;
-            positions[i] = pos;
-            initialPositions[i] = pos;
+        for (let i = 0; i < mainCount; i++) {
+            const i3 = i * 3;
+            mainPositions[i3] = (Math.random() - 0.5) * 100;
+            mainPositions[i3 + 1] = (Math.random() - 0.5) * 100;
+            mainPositions[i3 + 2] = (Math.random() - 0.5) * 100;
+            
+            mainInitialPos[i3] = mainPositions[i3];
+            mainInitialPos[i3 + 1] = mainPositions[i3 + 1];
+            mainInitialPos[i3 + 2] = mainPositions[i3 + 2];
+            
+            mainVelocities[i3] = (Math.random() - 0.5) * 0.02;
+            mainVelocities[i3 + 1] = (Math.random() - 0.5) * 0.02;
+            mainVelocities[i3 + 2] = (Math.random() - 0.5) * 0.02;
+            
+            // Color variation (purple to blue)
+            const colorMix = Math.random();
+            mainColors[i3] = 0.54 + colorMix * 0.15;     // R
+            mainColors[i3 + 1] = 0.36 + colorMix * 0.24; // G
+            mainColors[i3 + 2] = 0.96;                    // B
         }
 
-        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const pMat = new THREE.PointsMaterial({ 
-            color: 0x8b5cf6, 
-            size: 0.08,
+        mainParticles.setAttribute('position', new THREE.BufferAttribute(mainPositions, 3));
+        mainParticles.setAttribute('color', new THREE.BufferAttribute(mainColors, 3));
+        
+        const mainMat = new THREE.PointsMaterial({ 
+            size: 0.12,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.8,
+            vertexColors: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
         });
-        const pSys = new THREE.Points(particles, pMat);
-        scene.add(pSys);
+        
+        const mainSys = new THREE.Points(mainParticles, mainMat);
+        scene.add(mainSys);
+        particleSystems.push({ 
+            sys: mainSys, 
+            positions: mainPositions, 
+            initialPos: mainInitialPos,
+            velocities: mainVelocities,
+            speed: 1
+        });
 
-        camera.position.z = 40;
+        // Add connection lines between nearby particles
+        const lineGeometry = new THREE.BufferGeometry();
+        const linePositions = new Float32Array(mainCount * 6);
+        lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+        
+        const lineMaterial = new THREE.LineBasicMaterial({ 
+            color: 0x8b5cf6, 
+            transparent: true, 
+            opacity: 0.15,
+            blending: THREE.AdditiveBlending
+        });
+        
+        const lineSystem = new THREE.LineSegments(lineGeometry, lineMaterial);
+        scene.add(lineSystem);
+
+        camera.position.z = 50;
 
         // Mouse interaction variables
         let mouseX = 0;
         let mouseY = 0;
-        let targetRotationX = 0;
-        let targetRotationY = 0;
+        let targetMouseX = 0;
+        let targetMouseY = 0;
+        let mouseVelocityX = 0;
+        let mouseVelocityY = 0;
+        let prevMouseX = 0;
+        let prevMouseY = 0;
+        
+        // Cursor glow element
+        const cursorGlow = document.getElementById('cursorGlow');
 
-        // Track mouse movement
+        // Track mouse movement with velocity
         document.addEventListener('mousemove', (e) => {
-            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+            targetMouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            targetMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+            
+            // Update cursor glow
+            cursorGlow.style.left = e.clientX + 'px';
+            cursorGlow.style.top = e.clientY + 'px';
+            
+            // Calculate velocity
+            mouseVelocityX = targetMouseX - prevMouseX;
+            mouseVelocityY = targetMouseY - prevMouseY;
+            prevMouseX = targetMouseX;
+            prevMouseY = targetMouseY;
         });
 
-        // Particle interaction with mouse
+        // Mouse click creates wave effect
+        let waves = [];
+        document.addEventListener('click', (e) => {
+            const x = (e.clientX / window.innerWidth) * 2 - 1;
+            const y = -(e.clientY / window.innerHeight) * 2 + 1;
+            waves.push({ x: x * 25, y: y * 25, radius: 0, maxRadius: 15, strength: 2 });
+        });
+
+        // Advanced particle interaction
         function updateParticles() {
-            const positionArray = particles.attributes.position.array;
+            // Smooth mouse movement
+            mouseX += (targetMouseX - mouseX) * 0.1;
+            mouseY += (targetMouseY - mouseY) * 0.1;
             
-            for (let i = 0; i < pCount; i++) {
-                const i3 = i * 3;
+            const velocity = Math.sqrt(mouseVelocityX * mouseVelocityX + mouseVelocityY * mouseVelocityY);
+            
+            particleSystems.forEach(({ sys, positions, initialPos, velocities, speed }) => {
+                const posArray = positions;
+                let lineIndex = 0;
+                const lineArray = lineGeometry.attributes.position.array;
                 
-                // Calculate distance from mouse position in 3D space
-                const px = positionArray[i3];
-                const py = positionArray[i3 + 1];
-                
-                const dx = mouseX * 20 - px;
-                const dy = mouseY * 20 - py;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                // Push particles away from mouse
-                if (distance < 8) {
-                    const force = (8 - distance) / 8;
-                    positionArray[i3] -= dx * force * 0.02;
-                    positionArray[i3 + 1] -= dy * force * 0.02;
+                for (let i = 0; i < positions.length / 3; i++) {
+                    const i3 = i * 3;
+                    
+                    // Mouse repulsion with velocity-based force
+                    const px = posArray[i3];
+                    const py = posArray[i3 + 1];
+                    
+                    const dx = mouseX * 25 - px;
+                    const dy = mouseY * 25 - py;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Dynamic force based on mouse velocity
+                    const forceMultiplier = 1 + velocity * 30;
+                    
+                    if (distance < 12) {
+                        const force = (12 - distance) / 12 * forceMultiplier;
+                        velocities[i3] -= dx * force * 0.03;
+                        velocities[i3 + 1] -= dy * force * 0.03;
+                        velocities[i3 + 2] -= (Math.random() - 0.5) * force * 0.02;
+                    }
+                    
+                    // Wave effects from clicks
+                    waves.forEach(wave => {
+                        const wdx = wave.x - px;
+                        const wdy = wave.y - py;
+                        const wdist = Math.sqrt(wdx * wdx + wdy * wdy);
+                        
+                        if (Math.abs(wdist - wave.radius) < 2) {
+                            const wforce = wave.strength * (1 - wave.radius / wave.maxRadius);
+                            velocities[i3] -= wdx * wforce * 0.01;
+                            velocities[i3 + 1] -= wdy * wforce * 0.01;
+                        }
+                    });
+                    
+                    // Apply velocities
+                    posArray[i3] += velocities[i3];
+                    posArray[i3 + 1] += velocities[i3 + 1];
+                    posArray[i3 + 2] += velocities[i3 + 2];
+                    
+                    // Return to original position
+                    const returnForce = 0.02;
+                    velocities[i3] += (initialPos[i3] - posArray[i3]) * returnForce;
+                    velocities[i3 + 1] += (initialPos[i3 + 1] - posArray[i3 + 1]) * returnForce;
+                    velocities[i3 + 2] += (initialPos[i3 + 2] - posArray[i3 + 2]) * returnForce;
+                    
+                    // Damping
+                    velocities[i3] *= 0.97;
+                    velocities[i3 + 1] *= 0.97;
+                    velocities[i3 + 2] *= 0.97;
+                    
+                    // Draw connections to nearby particles
+                    if (i % 15 === 0 && lineIndex < lineArray.length - 6) {
+                        for (let j = i + 1; j < Math.min(i + 20, positions.length / 3); j++) {
+                            const j3 = j * 3;
+                            const dx = posArray[i3] - posArray[j3];
+                            const dy = posArray[i3 + 1] - posArray[j3 + 1];
+                            const dz = posArray[i3 + 2] - posArray[j3 + 2];
+                            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                            
+                            if (dist < 5) {
+                                lineArray[lineIndex++] = posArray[i3];
+                                lineArray[lineIndex++] = posArray[i3 + 1];
+                                lineArray[lineIndex++] = posArray[i3 + 2];
+                                lineArray[lineIndex++] = posArray[j3];
+                                lineArray[lineIndex++] = posArray[j3 + 1];
+                                lineArray[lineIndex++] = posArray[j3 + 2];
+                                break;
+                            }
+                        }
+                    }
                 }
                 
-                // Gradually return to original position
-                positionArray[i3] += (initialPositions[i3] - positionArray[i3]) * 0.02;
-                positionArray[i3 + 1] += (initialPositions[i3 + 1] - positionArray[i3 + 1]) * 0.02;
-                positionArray[i3 + 2] += (initialPositions[i3 + 2] - positionArray[i3 + 2]) * 0.02;
-            }
+                sys.geometry.attributes.position.needsUpdate = true;
+            });
             
-            particles.attributes.position.needsUpdate = true;
+            // Update wave effects
+            waves = waves.filter(wave => {
+                wave.radius += 0.3;
+                return wave.radius < wave.maxRadius;
+            });
+            
+            lineGeometry.attributes.position.needsUpdate = true;
         }
 
+        // Camera movement based on mouse
+        function updateCamera() {
+            camera.position.x += (mouseX * 5 - camera.position.x) * 0.05;
+            camera.position.y += (mouseY * 5 - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+        }
+
+        let time = 0;
         function animate() {
             requestAnimationFrame(animate);
+            time += 0.01;
             
-            // Smooth rotation based on mouse position
-            targetRotationX = mouseY * 0.3;
-            targetRotationY = mouseX * 0.3;
+            // Gentle auto-rotation
+            mainSys.rotation.x += 0.0001;
+            mainSys.rotation.y += 0.0002;
             
-            pSys.rotation.x += (targetRotationX - pSys.rotation.x) * 0.05;
-            pSys.rotation.y += (targetRotationY - pSys.rotation.y) * 0.05;
-            
-            // Auto-rotation (slower when mouse is active)
-            pSys.rotation.x += 0.0002;
-            pSys.rotation.y += 0.0004;
+            // Pulsing effect
+            mainMat.size = 0.12 + Math.sin(time) * 0.02;
             
             updateParticles();
+            updateCamera();
             renderer.render(scene, camera);
         }
         animate();
@@ -727,6 +886,7 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
         });
 
         // Load projects from Realtime Database
