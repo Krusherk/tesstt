@@ -115,11 +115,6 @@
             -webkit-text-fill-color: transparent;
         }
 
-        .nav-btns {
-            display: flex;
-            gap: 12px;
-        }
-
         .submit-btn {
             padding: 12px 24px;
             background: rgba(139, 92, 246, 0.1);
@@ -130,8 +125,6 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            text-decoration: none;
-            display: inline-block;
         }
 
         .submit-btn:hover {
@@ -480,7 +473,6 @@
         @media (max-width: 768px) {
             .grid { grid-template-columns: 1fr; }
             .modal-box { padding: 28px; }
-            .nav-btns { flex-direction: column; gap: 8px; }
         }
     </style>
 </head>
@@ -640,7 +632,7 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // Three.js Scene
+        // Three.js Scene with Mouse Interaction
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), alpha: true });
@@ -649,22 +641,84 @@
         const particles = new THREE.BufferGeometry();
         const pCount = 2000;
         const positions = new Float32Array(pCount * 3);
+        const initialPositions = new Float32Array(pCount * 3);
 
         for (let i = 0; i < pCount * 3; i++) {
-            positions[i] = (Math.random() - 0.5) * 80;
+            const pos = (Math.random() - 0.5) * 80;
+            positions[i] = pos;
+            initialPositions[i] = pos;
         }
 
         particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const pMat = new THREE.PointsMaterial({ color: 0x8b5cf6, size: 0.08 });
+        const pMat = new THREE.PointsMaterial({ 
+            color: 0x8b5cf6, 
+            size: 0.08,
+            transparent: true,
+            opacity: 0.8
+        });
         const pSys = new THREE.Points(particles, pMat);
         scene.add(pSys);
 
         camera.position.z = 40;
 
+        // Mouse interaction variables
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetRotationX = 0;
+        let targetRotationY = 0;
+
+        // Track mouse movement
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // Particle interaction with mouse
+        function updateParticles() {
+            const positionArray = particles.attributes.position.array;
+            
+            for (let i = 0; i < pCount; i++) {
+                const i3 = i * 3;
+                
+                // Calculate distance from mouse position in 3D space
+                const px = positionArray[i3];
+                const py = positionArray[i3 + 1];
+                
+                const dx = mouseX * 20 - px;
+                const dy = mouseY * 20 - py;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Push particles away from mouse
+                if (distance < 8) {
+                    const force = (8 - distance) / 8;
+                    positionArray[i3] -= dx * force * 0.02;
+                    positionArray[i3 + 1] -= dy * force * 0.02;
+                }
+                
+                // Gradually return to original position
+                positionArray[i3] += (initialPositions[i3] - positionArray[i3]) * 0.02;
+                positionArray[i3 + 1] += (initialPositions[i3 + 1] - positionArray[i3 + 1]) * 0.02;
+                positionArray[i3 + 2] += (initialPositions[i3 + 2] - positionArray[i3 + 2]) * 0.02;
+            }
+            
+            particles.attributes.position.needsUpdate = true;
+        }
+
         function animate() {
             requestAnimationFrame(animate);
+            
+            // Smooth rotation based on mouse position
+            targetRotationX = mouseY * 0.3;
+            targetRotationY = mouseX * 0.3;
+            
+            pSys.rotation.x += (targetRotationX - pSys.rotation.x) * 0.05;
+            pSys.rotation.y += (targetRotationY - pSys.rotation.y) * 0.05;
+            
+            // Auto-rotation (slower when mouse is active)
             pSys.rotation.x += 0.0002;
             pSys.rotation.y += 0.0004;
+            
+            updateParticles();
             renderer.render(scene, camera);
         }
         animate();
