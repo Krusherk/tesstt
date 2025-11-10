@@ -316,12 +316,73 @@
             font-size: 13px;
             font-weight: 600;
             transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .link:hover {
             background: rgba(139, 92, 246, 0.2);
             border-color: rgba(139, 92, 246, 0.4);
             color: #8b5cf6;
+        }
+
+        .x-icon {
+            width: 14px;
+            height: 14px;
+        }
+
+        .prize-popup {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            background: rgba(15, 15, 15, 0.95);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            padding: 20px 24px;
+            max-width: 350px;
+            z-index: 2000;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            cursor: pointer;
+            opacity: 0;
+            transform: translateX(400px);
+            animation: slideInPrize 0.3s forwards 3s;
+        }
+
+        @keyframes slideInPrize {
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .prize-popup:hover {
+            background: rgba(20, 20, 20, 0.95);
+            border-color: rgba(139, 92, 246, 0.5);
+        }
+
+        .prize-popup.hide {
+            animation: slideOutPrize 0.3s forwards;
+        }
+
+        @keyframes slideOutPrize {
+            to {
+                opacity: 0;
+                transform: translateX(400px);
+            }
+        }
+
+        .prize-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #8b5cf6;
+        }
+
+        .prize-text {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.5;
         }
 
         .modal {
@@ -495,6 +556,12 @@
     <div class="cursor-glow" id="cursorGlow"></div>
     <canvas id="canvas3d"></canvas>
 
+    <!-- Prize Popup -->
+    <div class="prize-popup" id="prizePopup">
+        <div class="prize-title">🎉 Congratulations!</div>
+        <div class="prize-text">You're visitor #100. You won a Monad plushie. Click to claim.</div>
+    </div>
+
     <div class="wrap">
         <nav>
             <div class="brand-section">
@@ -644,6 +711,28 @@
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
         }
+
+        // Prize Popup Logic
+        const prizePopup = document.getElementById('prizePopup');
+        let popupTimeout;
+
+        // Auto-hide after 20 seconds
+        popupTimeout = setTimeout(() => {
+            prizePopup.classList.add('hide');
+            setTimeout(() => {
+                prizePopup.style.display = 'none';
+            }, 300);
+        }, 23000); // 3s delay + 20s display
+
+        // Click to rickroll
+        prizePopup.addEventListener('click', () => {
+            clearTimeout(popupTimeout);
+            window.open('https://youtu.be/dQw4w9WgXcQ?si=3nFJCunVSYmwZQxt', '_blank');
+            prizePopup.classList.add('hide');
+            setTimeout(() => {
+                prizePopup.style.display = 'none';
+            }, 300);
+        });
 
         // Advanced Three.js Scene with Enhanced Mouse Interaction
         const scene = new THREE.Scene();
@@ -944,7 +1033,7 @@
             grid.innerHTML = filtered.map(p => `
                 <div class="card">
                     <div class="card-top">
-                        <img src="${p.logo ? 'Logos/' + p.logo : 'https://via.placeholder.com/64'}" class="proj-logo" onerror="this.src='https://via.placeholder.com/64'">
+                        <img src="${p.logo || 'https://via.placeholder.com/64'}" class="proj-logo" onerror="this.src='https://via.placeholder.com/64'">
                         <div class="proj-info">
                             <h3>${p.name}</h3>
                             <span class="tag">${p.category}</span>
