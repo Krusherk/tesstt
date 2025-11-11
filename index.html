@@ -1011,6 +1011,8 @@
                     projects.push({ id: key, ...data[key] });
                 });
             }
+            // Sort alphabetically by name
+            projects.sort((a, b) => a.name.localeCompare(b.name));
             render();
             renderCats();
         });
@@ -1022,6 +1024,9 @@
                 const matchCat = currentCat === 'all' || p.category === currentCat;
                 return matchSearch && matchCat;
             });
+
+            // Sort filtered results alphabetically
+            filtered.sort((a, b) => a.name.localeCompare(b.name));
 
             const grid = document.getElementById('grid');
             
