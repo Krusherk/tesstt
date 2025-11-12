@@ -680,6 +680,19 @@
         let recommendedProjects = [];
         let logoSpheres = [];
 
+        // Helper function to get correct logo URL (handles both local files and CDN URLs)
+        function getLogoUrl(logo) {
+            if (!logo) return 'https://via.placeholder.com/64';
+            
+            // If it's already a full URL (starts with http:// or https://)
+            if (logo.startsWith('http://') || logo.startsWith('https://')) {
+                return logo;
+            }
+            
+            // Otherwise, it's a local file - add Logos/ prefix
+            return 'Logos/' + logo;
+        }
+
         // Modal
         window.openSubmitModal = () => document.getElementById('modal').classList.add('show');
         window.closeSubmitModal = () => {
@@ -740,9 +753,12 @@
         const customCursor = document.getElementById('customCursor');
         
         document.addEventListener('mousemove', (e) => {
-            customCursor.style.left = e.clientX + 'px';
-            customCursor.style.top = e.clientY + 'px';
+            if (customCursor) {
+                customCursor.style.left = e.clientX + 'px';
+                customCursor.style.top = e.clientY + 'px';
+            }
         });
+        
         const prizePopup = document.getElementById('prizePopup');
         let popupTimeout;
 
@@ -1077,10 +1093,12 @@
 
             grid.innerHTML = filtered.map(p => {
                 const categories = Array.isArray(p.categories) ? p.categories : [p.category];
+                const logoUrl = getLogoUrl(p.logo); // USE THE HELPER FUNCTION HERE
+                
                 return `
                 <div class="card">
                     <div class="card-top">
-                        <img src="${p.logo ? 'Logos/' + p.logo : 'https://via.placeholder.com/64'}" class="proj-logo" onerror="this.src='https://via.placeholder.com/64'">
+                        <img src="${logoUrl}" class="proj-logo" onerror="this.src='https://via.placeholder.com/64'">
                         <div class="proj-info">
                             <h3>${p.name}</h3>
                             <div class="tags-container">
@@ -1135,8 +1153,10 @@
             
             // Load texture
             const textureLoader = new THREE.TextureLoader();
+            const logoUrl = getLogoUrl(project.logo); // USE THE HELPER FUNCTION HERE TOO
+            
             textureLoader.load(
-                'Logos/' + project.logo,
+                logoUrl,
                 (texture) => {
                     const material = new THREE.MeshBasicMaterial({ 
                         map: texture,
