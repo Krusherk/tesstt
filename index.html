@@ -662,6 +662,7 @@
                         <option value="Identity">Identity</option>
                         <option value="Prediction Market">Prediction Market</option>
                         <option value="RWA">RWA</option>
+                        <option value="Betting">Betting</option>
                         <option value="Liquid Staking">Liquid Staking</option>
                         <option value="Lending">Lending</option>
                         <option value="Other">Other</option>
@@ -767,25 +768,12 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // Custom Cursor
+        // Custom Cursor (simple version - no animations)
         const customCursor = document.getElementById('customCursor');
         
         document.addEventListener('mousemove', (e) => {
             customCursor.style.left = e.clientX + 'px';
             customCursor.style.top = e.clientY + 'px';
-        });
-
-        // Hover effect for interactive elements
-        document.addEventListener('mouseover', (e) => {
-            if (e.target.closest('a, button, .card, .cat')) {
-                customCursor.classList.add('hover');
-            }
-        });
-
-        document.addEventListener('mouseout', (e) => {
-            if (e.target.closest('a, button, .card, .cat')) {
-                customCursor.classList.remove('hover');
-            }
         });
         const prizePopup = document.getElementById('prizePopup');
         let popupTimeout;
