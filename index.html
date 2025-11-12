@@ -82,38 +82,6 @@
             transform: translate(-50%, -50%);
         }
 
-        .custom-cursor {
-            width: 20px;
-            height: 20px;
-            border: 2px solid #8b5cf6;
-            border-radius: 50%;
-            position: fixed;
-            pointer-events: none;
-            z-index: 9999;
-            transform: translate(-50%, -50%);
-            mix-blend-mode: difference;
-        }
-
-        .custom-cursor::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 4px;
-            height: 4px;
-            background: #8b5cf6;
-            border-radius: 50%;
-        }
-
-        body {
-            cursor: none;
-        }
-
-        a, button, .card, .cat {
-            cursor: none;
-        }
-
         .wrap {
             max-width: 1400px;
             margin: 0 auto;
@@ -594,7 +562,6 @@
     <div class="glow glow-1"></div>
     <div class="glow glow-2"></div>
     <div class="cursor-glow" id="cursorGlow"></div>
-    <div class="custom-cursor" id="customCursor"></div>
     <canvas id="canvas3d"></canvas>
 
     <!-- Prize Popup -->
