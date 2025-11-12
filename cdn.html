@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Logo URLs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(15, 15, 15, 0.8);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 20px;
+            padding: 40px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .info {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: 12px;
+            margin-bottom: 12px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+        }
+
+        .btn-sec {
+            background: transparent;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .status {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.8;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .success {
+            color: #4ade80;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+
+        .warning {
+            color: #fbbf24;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 20px;
+            background: rgba(139, 92, 246, 0.04);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            margin-top: 20px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fix Logo URLs</h1>
+        <p class="info">
+            Choose an option:<br><br>
+            <strong>Option 1 (Recommended):</strong> Convert logo filenames to full CDN URLs so they load properly<br>
+            <strong>Option 2:</strong> Delete all projects that have CDN-based logos<br>
+            <strong>Option 3:</strong> Scan and show which projects have broken logos
+        </p>
+        
+        <button class="btn" onclick="scanLogos()">Scan Logos</button>
+        <button class="btn" onclick="fixLogos()">Fix Logos (Use Full CDN URLs)</button>
+        <button class="btn btn-danger" onclick="deleteWithCDN()">Delete Projects with CDN Logos</button>
+        
+        <div style="margin-top: 30px;">
+            <p class="info">Paste your original project data here (needed for fixing logos with CDN URLs):</p>
+            <textarea id="projectData" placeholder="Paste the TSV data with CDN URLs here..."></textarea>
+        </div>
+        
+        <div id="status"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCt-I2vo7_OOCokCoHIUV_caNxsFJpEPqM",
+            authDomain: "nadiscovery-c43aa.firebaseapp.com",
+            databaseURL: "https://nadiscovery-c43aa-default-rtdb.firebaseio.com",
+            projectId: "nadiscovery-c43aa",
+            storageBucket: "nadiscovery-c43aa.firebasestorage.app",
+            messagingSenderId: "1060132821025",
+            appId: "1:1060132821025:web:f5c60ce29f7586ba6c6b60",
+            measurementId: "G-ZXTM24PHJZ"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Parse project data to create name -> CDN URL mapping
+        function createLogoMap(text) {
+            const lines = text.trim().split('\n');
+            const logoMap = new Map();
+            
+            for (let line of lines) {
+                if (!line.trim()) continue;
+                const parts = line.split('\t');
+                if (parts.length < 2) continue;
+                
+                const [name, logoUrl] = parts;
+                if (logoUrl && logoUrl.startsWith('http')) {
+                    logoMap.set(name.trim().toLowerCase(), logoUrl.trim());
+                }
+            }
+            
+            return logoMap;
+        }
+
+        window.scanLogos = async function() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status';
+            statusDiv.innerHTML = '<div class="info">Scanning projects...</div>';
+            
+            try {
+                const projectsRef = ref(db, 'projects');
+                const snapshot = await get(projectsRef);
+                
+                if (!snapshot.exists()) {
+                    statusDiv.innerHTML = '<div class="error">No projects found</div>';
+                    return;
+                }
+                
+                const data = snapshot.val();
+                let cdnLogos = 0;
+                let localLogos = 0;
+                let noLogos = 0;
+                
+                const cdnProjects = [];
+                
+                Object.entries(data).forEach(([id, project]) => {
+                    if (!project.logo || project.logo === '') {
+                        noLogos++;
+                    } else if (project.logo.includes('.webp') || project.logo.includes('.jpg') || project.logo.includes('.png')) {
+                        cdnLogos++;
+                        cdnProjects.push(project.name);
+                    } else {
+                        localLogos++;
+                    }
+                });
+                
+                statusDiv.innerHTML = `
+                    <div class="info">
+                        <strong>Scan Results:</strong><br>
+                        Total Projects: ${Object.keys(data).length}<br><br>
+                        Projects with CDN-style logos: <span class="warning">${cdnLogos}</span><br>
+                        Projects with local logos: <span class="success">${localLogos}</span><br>
+                        Projects without logos: ${noLogos}<br><br>
+                        <strong>Projects with CDN logos:</strong><br>
+                        ${cdnProjects.map(name => `• ${name}`).join('<br>')}
+                    </div>
+                `;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        };
+
+        window.fixLogos = async function() {
+            const text = document.getElementById('projectData').value;
+            if (!text.trim()) {
+                document.getElementById('status').innerHTML = '<div class="error">Please paste your project data first!</div>';
+                return;
+            }
+            
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status';
+            statusDiv.innerHTML = '<div class="info">Creating logo mapping...</div>';
+            
+            const logoMap = createLogoMap(text);
+            statusDiv.innerHTML += `<div class="info">Found ${logoMap.size} CDN URLs in your data</div>`;
+            
+            try {
+                const projectsRef = ref(db, 'projects');
+                const snapshot = await get(projectsRef);
+                
+                if (!snapshot.exists()) {
+                    statusDiv.innerHTML += '<div class="error">No projects found</div>';
+                    return;
+                }
+                
+                const data = snapshot.val();
+                let fixed = 0;
+                let notFound = 0;
+                
+                for (let [id, project] of Object.entries(data)) {
+                    const cdnUrl = logoMap.get(project.name.toLowerCase());
+                    
+                    if (cdnUrl && project.logo && !project.logo.startsWith('http')) {
+                        const projectRef = ref(db, `projects/${id}`);
+                        await update(projectRef, { logo: cdnUrl });
+                        fixed++;
+                        statusDiv.innerHTML += `<div class="success">✓ Fixed: ${project.name}</div>`;
+                    } else if (project.logo && !project.logo.startsWith('http')) {
+                        notFound++;
+                        statusDiv.innerHTML += `<div class="warning">⊘ No CDN URL found for: ${project.name}</div>`;
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+                
+                statusDiv.innerHTML += `
+                    <div class="success" style="margin-top: 20px; font-size: 16px; font-weight: 700;">
+                        ✓ Fix Complete!<br>
+                        Fixed: ${fixed}<br>
+                        Not found in data: ${notFound}
+                    </div>
+                `;
+                
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="error">Error: ${error.message}</div>`;
+            }
+        };
+
+        window.deleteWithCDN = async function() {
+            if (!confirm('Are you sure you want to DELETE all projects with CDN-style logos? This cannot be undone!')) {
+                return;
+            }
+            
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status';
+            statusDiv.innerHTML = '<div class="info">Finding projects to delete...</div>';
+            
+            try {
+                const projectsRef = ref(db, 'projects');
+                const snapshot = await get(projectsRef);
+                
+                if (!snapshot.exists()) {
+                    statusDiv.innerHTML = '<div class="error">No projects found</div>';
+                    return;
+                }
+                
+                const data = snapshot.val();
+                let deleted = 0;
+                
+                for (let [id, project] of Object.entries(data)) {
+                    // Check if logo looks like a CDN filename (has extensions but not full URL)
+                    if (project.logo && 
+                        !project.logo.startsWith('http') && 
+                        (project.logo.includes('.webp') || project.logo.includes('.jpg') || project.logo.includes('.png'))) {
+                        
+                        const projectRef = ref(db, `projects/${id}`);
+                        await remove(projectRef);
+                        deleted++;
+                        statusDiv.innerHTML += `<div class="error">✗ Deleted: ${project.name}</div>`;
+                        
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                }
+                
+                statusDiv.innerHTML += `
+                    <div class="success" style="margin-top: 20px; font-size: 16px; font-weight: 700;">
+                        ✓ Deletion Complete!<br>
+                        Deleted: ${deleted} projects
+                    </div>
+                `;
+                
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="error">Error: ${error.message}</div>`;
+            }
+        };
+    </script>
+</body>
+</html>
