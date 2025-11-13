@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Mode - NAD Discovery</title>
+    <link rel="icon" type="image/jpeg" href="monadl.jpg">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #canvas3d {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            gap: 20px;
+            background: rgba(15, 15, 15, 0.8);
+            padding: 20px 30px;
+            border-radius: 16px;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .back-btn {
+            padding: 12px 24px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            color: rgba(139, 92, 246, 0.9);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .back-btn:hover {
+            background: rgba(139, 92, 246, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .info-text {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: rgba(15, 15, 15, 0.95);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 16px;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 10000;
+            display: none;
+            white-space: nowrap;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: 700;
+            color: #8b5cf6;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas3d"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+    <div class="loading" id="loading">Loading Space Mode...</div>
+    
+    <div class="controls">
+        <a href="index.html" class="back-btn">← Back to Home</a>
+        <div class="info-text">Use mouse to look around • Click logos to visit projects</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCt-I2vo7_OOCokCoHIUV_caNxsFJpEPqM",
+            authDomain: "nadiscovery-c43aa.firebaseapp.com",
+            databaseURL: "https://nadiscovery-c43aa-default-rtdb.firebaseio.com",
+            projectId: "nadiscovery-c43aa",
+            storageBucket: "nadiscovery-c43aa.firebasestorage.app",
+            messagingSenderId: "1060132821025",
+            appId: "1:1060132821025:web:f5c60ce29f7586ba6c6b60",
+            measurementId: "G-ZXTM24PHJZ"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Three.js setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        camera.position.z = 5;
+
+        // Create starfield
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 5000;
+        const starPositions = new Float32Array(starCount * 3);
+        
+        for (let i = 0; i < starCount * 3; i += 3) {
+            starPositions[i] = (Math.random() - 0.5) * 200;
+            starPositions[i + 1] = (Math.random() - 0.5) * 200;
+            starPositions[i + 2] = (Math.random() - 0.5) * 200;
+        }
+        
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starMaterial = new THREE.PointsMaterial({ 
+            color: 0xffffff, 
+            size: 0.1,
+            transparent: true,
+            opacity: 0.8
+        });
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+
+        // Array to hold project logo spheres
+        let logoSpheres = [];
+        let projects = [];
+
+        // Load projects
+        const projectsRef = ref(db, 'projects');
+        onValue(projectsRef, (snapshot) => {
+            projects = [];
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                Object.keys(data).forEach(key => {
+                    const project = { id: key, ...data[key] };
+                    if (project.logo) {
+                        projects.push(project);
+                    }
+                });
+            }
+            createLogoSpheres();
+        });
+
+        function createLogoSpheres() {
+            // Clear existing spheres
+            logoSpheres.forEach(sphere => {
+                scene.remove(sphere);
+                if (sphere.geometry) sphere.geometry.dispose();
+                if (sphere.material) {
+                    if (sphere.material.map) sphere.material.map.dispose();
+                    sphere.material.dispose();
+                }
+            });
+            logoSpheres = [];
+
+            const textureLoader = new THREE.TextureLoader();
+            
+            projects.forEach((project, index) => {
+                const geometry = new THREE.SphereGeometry(3, 32, 32);
+                const logoUrl = project.logo.startsWith('http') ? project.logo : 'Logos/' + project.logo;
+                
+                textureLoader.load(
+                    logoUrl,
+                    (texture) => {
+                        const material = new THREE.MeshBasicMaterial({ 
+                            map: texture,
+                            transparent: true,
+                            opacity: 1
+                        });
+                        
+                        const sphere = new THREE.Mesh(geometry, material);
+                        
+                        // Position spheres in a spiral path through space
+                        const spiralIndex = index;
+                        const angle = spiralIndex * 0.5;
+                        const distance = 30 + spiralIndex * 8;
+                        
+                        sphere.position.x = Math.cos(angle) * distance;
+                        sphere.position.y = (spiralIndex - projects.length / 2) * 12;
+                        sphere.position.z = -Math.sin(angle) * distance;
+                        
+                        sphere.userData = {
+                            project: project,
+                            rotationSpeed: 0.005 + Math.random() * 0.01,
+                            originalPosition: sphere.position.clone()
+                        };
+                        
+                        scene.add(sphere);
+                        logoSpheres.push(sphere);
+                    },
+                    undefined,
+                    (error) => console.log('Logo load error:', error)
+                );
+            });
+            
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Mouse controls for camera rotation
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // Raycaster for interactions
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const tooltip = document.getElementById('tooltip');
+
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(logoSpheres);
+            
+            if (intersects.length > 0) {
+                const project = intersects[0].object.userData.project;
+                tooltip.textContent = project.name;
+                tooltip.style.display = 'block';
+                tooltip.style.left = event.clientX + 15 + 'px';
+                tooltip.style.top = event.clientY + 15 + 'px';
+                document.body.style.cursor = 'pointer';
+            } else {
+                tooltip.style.display = 'none';
+                document.body.style.cursor = 'default';
+            }
+        });
+
+        window.addEventListener('click', (event) => {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(logoSpheres);
+            
+            if (intersects.length > 0) {
+                const project = intersects[0].object.userData.project;
+                if (project.website) {
+                    window.open(project.website, '_blank');
+                }
+            }
+        });
+
+        // Animation loop
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+            
+            // Rotate stars slowly
+            stars.rotation.y += 0.0002;
+            
+            // Move camera through space automatically
+            camera.position.z += 0.05;
+            
+            // Add mouse-based camera rotation
+            camera.rotation.y += (mouseX * 0.3 - camera.rotation.y) * 0.05;
+            camera.rotation.x += (mouseY * 0.3 - camera.rotation.x) * 0.05;
+            
+            // Rotate logo spheres
+            logoSpheres.forEach((sphere, index) => {
+                sphere.rotation.y += sphere.userData.rotationSpeed;
+                
+                // Make spheres float slightly
+                sphere.position.y = sphere.userData.originalPosition.y + Math.sin(time + index) * 2;
+                
+                // If sphere goes behind camera, reposition it ahead
+                if (sphere.position.z > camera.position.z + 10) {
+                    sphere.position.z -= 300;
+                }
+            });
+            
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+        });
+    </script>
+</body>
+</html>
