@@ -147,7 +147,7 @@
     <div class="controls">
         <div class="controls-row">
             <a href="index.html" class="back-btn">← Back to Home</a>
-            <div class="info-text">WASD or Arrow Keys to move • Mouse to look • Click logos</div>
+            <div class="info-text">WASD/Arrows • Right-click drag to look • Scroll to zoom • Click logos</div>
         </div>
         <div class="controls-row">
             <div class="nav-controls">
@@ -258,13 +258,13 @@
                         
                         const sphere = new THREE.Mesh(geometry, material);
                         
-                        // Position spheres in a spiral path through space
+                        // Position spheres in a tighter spiral path through space
                         const spiralIndex = index;
-                        const angle = spiralIndex * 0.5;
-                        const distance = 30 + spiralIndex * 8;
+                        const angle = spiralIndex * 0.8;
+                        const distance = 15 + spiralIndex * 3;
                         
                         sphere.position.x = Math.cos(angle) * distance;
-                        sphere.position.y = (spiralIndex - projects.length / 2) * 12;
+                        sphere.position.y = (spiralIndex - projects.length / 2) * 5;
                         sphere.position.z = -Math.sin(angle) * distance;
                         
                         sphere.userData = {
@@ -284,14 +284,59 @@
             document.getElementById('loading').style.display = 'none';
         }
 
-        // Mouse controls for camera rotation
+        // Mouse controls for camera rotation and movement
         let mouseX = 0;
         let mouseY = 0;
+        let isMouseDown = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
         
         document.addEventListener('mousemove', (event) => {
             mouseX = (event.clientX / window.innerWidth) * 2 - 1;
             mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Move camera with right mouse button
+            if (isMouseDown && event.buttons === 2) {
+                const deltaX = event.clientX - lastMouseX;
+                const deltaY = event.clientY - lastMouseY;
+                
+                camera.rotation.y -= deltaX * 0.003;
+                camera.rotation.x -= deltaY * 0.003;
+                
+                // Limit vertical rotation
+                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+            }
+            
+            lastMouseX = event.clientX;
+            lastMouseY = event.clientY;
         });
+        
+        document.addEventListener('mousedown', (event) => {
+            if (event.button === 2) {
+                isMouseDown = true;
+                lastMouseX = event.clientX;
+                lastMouseY = event.clientY;
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+        
+        // Prevent context menu on right click
+        document.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+        });
+        
+        // Scroll wheel for forward/backward movement
+        document.addEventListener('wheel', (event) => {
+            event.preventDefault();
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+            
+            const scrollSpeed = event.deltaY * 0.01;
+            camera.position.add(cameraDirection.multiplyScalar(-scrollSpeed));
+        }, { passive: false });
 
         // Keyboard and button controls for movement
         const movement = {
@@ -429,9 +474,11 @@
                 camera.position.add(right.multiplyScalar(movement.speed));
             }
             
-            // Add mouse-based camera rotation
-            camera.rotation.y += (mouseX * 0.5 - camera.rotation.y) * 0.05;
-            camera.rotation.x += (mouseY * 0.5 - camera.rotation.x) * 0.05;
+            // Subtle mouse-based camera tilt (only when not dragging)
+            if (!isMouseDown) {
+                camera.rotation.y += (mouseX * 0.1 - camera.rotation.y) * 0.02;
+                camera.rotation.x += (mouseY * 0.1 - camera.rotation.x) * 0.02;
+            }
             
             // Rotate logo spheres
             logoSpheres.forEach((sphere, index) => {
