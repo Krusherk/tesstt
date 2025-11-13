@@ -1120,12 +1120,8 @@
                 return;
             }
 
-            // Smart recommendations based on search
-            if (search) {
-                recommendSmartProjects(search, filtered);
-            } else {
-                clearLogoSpheres();
-            }
+            // Always show 3D logo spheres for all projects
+            recommendAllProjects(filtered);
 
             grid.innerHTML = filtered.map(p => {
                 const categories = Array.isArray(p.categories) ? p.categories : [p.category];
@@ -1170,13 +1166,13 @@
             `).join('');
         }
 
-        // Smart recommendations with 3D logo spheres
-        function recommendSmartProjects(searchTerm, filteredProjects) {
+        // Show all projects as 3D logo spheres
+        function recommendAllProjects(filteredProjects) {
             // Clear old spheres first
             clearLogoSpheres();
             
-            // Get up to 8 recommended projects
-            recommendedProjects = filteredProjects.slice(0, 8);
+            // Get up to 6 projects to display
+            recommendedProjects = filteredProjects.slice(0, 6);
             
             recommendedProjects.forEach((project, index) => {
                 if (project.logo) {
