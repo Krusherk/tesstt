@@ -42,6 +42,50 @@
             padding: 20px 30px;
             border-radius: 16px;
             border: 1px solid rgba(139, 92, 246, 0.3);
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            width: 120px;
+        }
+
+        .nav-btn {
+            padding: 12px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-btn:hover {
+            background: rgba(139, 92, 246, 0.4);
+            transform: scale(1.05);
+        }
+
+        .nav-btn:active {
+            transform: scale(0.95);
+        }
+
+        .nav-btn.empty {
+            opacity: 0;
+            pointer-events: none;
         }
 
         .back-btn {
@@ -101,8 +145,20 @@
     <div class="loading" id="loading">Loading Space Mode...</div>
     
     <div class="controls">
-        <a href="index.html" class="back-btn">← Back to Home</a>
-        <div class="info-text">Use mouse to look around • Click logos to visit projects</div>
+        <div class="controls-row">
+            <a href="index.html" class="back-btn">← Back to Home</a>
+            <div class="info-text">WASD or Arrow Keys to move • Mouse to look • Click logos</div>
+        </div>
+        <div class="controls-row">
+            <div class="nav-controls">
+                <div class="nav-btn empty"></div>
+                <button class="nav-btn" id="forwardBtn">↑</button>
+                <div class="nav-btn empty"></div>
+                <button class="nav-btn" id="leftBtn">←</button>
+                <button class="nav-btn" id="backBtn">↓</button>
+                <button class="nav-btn" id="rightBtn">→</button>
+            </div>
+        </div>
     </div>
 
     <script type="module">
@@ -237,6 +293,75 @@
             mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
         });
 
+        // Keyboard and button controls for movement
+        const movement = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            speed: 0.5
+        };
+
+        // Keyboard controls
+        document.addEventListener('keydown', (event) => {
+            switch(event.key.toLowerCase()) {
+                case 'w':
+                case 'arrowup':
+                    movement.forward = true;
+                    break;
+                case 's':
+                case 'arrowdown':
+                    movement.backward = true;
+                    break;
+                case 'a':
+                case 'arrowleft':
+                    movement.left = true;
+                    break;
+                case 'd':
+                case 'arrowright':
+                    movement.right = true;
+                    break;
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            switch(event.key.toLowerCase()) {
+                case 'w':
+                case 'arrowup':
+                    movement.forward = false;
+                    break;
+                case 's':
+                case 'arrowdown':
+                    movement.backward = false;
+                    break;
+                case 'a':
+                case 'arrowleft':
+                    movement.left = false;
+                    break;
+                case 'd':
+                case 'arrowright':
+                    movement.right = false;
+                    break;
+            }
+        });
+
+        // Button controls
+        document.getElementById('forwardBtn').addEventListener('mousedown', () => movement.forward = true);
+        document.getElementById('forwardBtn').addEventListener('mouseup', () => movement.forward = false);
+        document.getElementById('forwardBtn').addEventListener('mouseleave', () => movement.forward = false);
+
+        document.getElementById('backBtn').addEventListener('mousedown', () => movement.backward = true);
+        document.getElementById('backBtn').addEventListener('mouseup', () => movement.backward = false);
+        document.getElementById('backBtn').addEventListener('mouseleave', () => movement.backward = false);
+
+        document.getElementById('leftBtn').addEventListener('mousedown', () => movement.left = true);
+        document.getElementById('leftBtn').addEventListener('mouseup', () => movement.left = false);
+        document.getElementById('leftBtn').addEventListener('mouseleave', () => movement.left = false);
+
+        document.getElementById('rightBtn').addEventListener('mousedown', () => movement.right = true);
+        document.getElementById('rightBtn').addEventListener('mouseup', () => movement.right = false);
+        document.getElementById('rightBtn').addEventListener('mouseleave', () => movement.right = false);
+
         // Raycaster for interactions
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
@@ -283,12 +408,30 @@
             // Rotate stars slowly
             stars.rotation.y += 0.0002;
             
-            // Move camera through space automatically
-            camera.position.z += 0.05;
+            // Handle movement
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+            
+            if (movement.forward) {
+                camera.position.add(cameraDirection.multiplyScalar(movement.speed));
+            }
+            if (movement.backward) {
+                camera.position.add(cameraDirection.multiplyScalar(-movement.speed));
+            }
+            if (movement.left) {
+                const left = new THREE.Vector3();
+                left.crossVectors(camera.up, cameraDirection).normalize();
+                camera.position.add(left.multiplyScalar(movement.speed));
+            }
+            if (movement.right) {
+                const right = new THREE.Vector3();
+                right.crossVectors(cameraDirection, camera.up).normalize();
+                camera.position.add(right.multiplyScalar(movement.speed));
+            }
             
             // Add mouse-based camera rotation
-            camera.rotation.y += (mouseX * 0.3 - camera.rotation.y) * 0.05;
-            camera.rotation.x += (mouseY * 0.3 - camera.rotation.x) * 0.05;
+            camera.rotation.y += (mouseX * 0.5 - camera.rotation.y) * 0.05;
+            camera.rotation.x += (mouseY * 0.5 - camera.rotation.x) * 0.05;
             
             // Rotate logo spheres
             logoSpheres.forEach((sphere, index) => {
@@ -297,10 +440,12 @@
                 // Make spheres float slightly
                 sphere.position.y = sphere.userData.originalPosition.y + Math.sin(time + index) * 2;
                 
-                // If sphere goes behind camera, reposition it ahead
-                if (sphere.position.z > camera.position.z + 10) {
-                    sphere.position.z -= 300;
-                }
+                // Calculate distance to camera
+                const distance = camera.position.distanceTo(sphere.position);
+                
+                // Scale spheres based on distance (closer = bigger)
+                const scale = Math.max(0.5, Math.min(2, 50 / distance));
+                sphere.scale.set(scale, scale, scale);
             });
             
             renderer.render(scene, camera);
