@@ -729,8 +729,15 @@
 
         function updateStats() {
             document.getElementById('totalProjects').textContent = projects.length;
-            const cats = new Set(projects.map(p => p.category));
-            document.getElementById('totalCategories').textContent = cats.size;
+            
+            // Get all unique categories from all projects
+            const allCategories = new Set();
+            projects.forEach(p => {
+                const categories = Array.isArray(p.categories) ? p.categories : [p.category];
+                categories.forEach(cat => allCategories.add(cat));
+            });
+            
+            document.getElementById('totalCategories').textContent = allCategories.size;
             document.getElementById('pendingReviews').textContent = submissions.length;
             document.getElementById('lastUpdated').textContent = new Date().toLocaleDateString();
         }
@@ -763,14 +770,18 @@
             }).join('');
         }
 
-        // Search
+        // Search - FIXED VERSION
         window.searchProjects = function() {
             const search = document.getElementById('searchTable').value.toLowerCase();
-            projects = allProjects.filter(p => 
-                p.name.toLowerCase().includes(search) || 
-                p.description.toLowerCase().includes(search) ||
-                p.category.toLowerCase().includes(search)
-            );
+            projects = allProjects.filter(p => {
+                // Handle both array and string categories
+                const categories = Array.isArray(p.categories) ? p.categories : [p.category];
+                const categoriesText = categories.join(' ').toLowerCase();
+                
+                return p.name.toLowerCase().includes(search) || 
+                       p.description.toLowerCase().includes(search) ||
+                       categoriesText.includes(search);
+            });
             renderTable();
         };
 
