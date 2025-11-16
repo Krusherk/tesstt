@@ -333,8 +333,8 @@
             const textureLoader = new THREE.TextureLoader();
             
             // Create a grid of projects in all directions for true infinite feel
-            const gridSize = 5; // 5x5x5 grid
-            const spacing = 40; // Distance between grid points
+            const gridSize = 2; // 2x2x2 grid (much smaller, less lag)
+            const spacing = 35; // Distance between grid points
             
             for (let gx = -gridSize; gx <= gridSize; gx++) {
                 for (let gy = -gridSize; gy <= gridSize; gy++) {
