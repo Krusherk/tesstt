@@ -330,19 +330,41 @@
             });
             logoSpheres = [];
 
+            // Create initial spheres around starting position
+            updateProjectsAroundCamera();
+            
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Dynamic sphere management - creates/removes spheres based on camera position
+        const sphereCache = new Map(); // Store created spheres by grid position
+        const renderDistance = 150; // How far to render spheres
+        const gridSpacing = 60; // Space between grid points
+
+        function updateProjectsAroundCamera() {
             const textureLoader = new THREE.TextureLoader();
             
-            // Create a grid of projects in all directions for true infinite feel
-            const gridSize = 2; // 2x2x2 grid (much smaller, less lag)
-            const spacing = 35; // Distance between grid points
+            // Calculate grid position of camera
+            const camGridX = Math.floor(camera.position.x / gridSpacing);
+            const camGridY = Math.floor(camera.position.y / gridSpacing);
+            const camGridZ = Math.floor(camera.position.z / gridSpacing);
             
-            for (let gx = -gridSize; gx <= gridSize; gx++) {
-                for (let gy = -gridSize; gy <= gridSize; gy++) {
-                    for (let gz = -gridSize; gz <= gridSize; gz++) {
-                        // Skip the center area where camera starts
-                        if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1 && Math.abs(gz) <= 1) continue;
+            const loadRadius = 3; // Load 3 grid cells in each direction
+            
+            // Track which positions should exist
+            const shouldExist = new Set();
+            
+            // Create spheres in grid around camera
+            for (let gx = camGridX - loadRadius; gx <= camGridX + loadRadius; gx++) {
+                for (let gy = camGridY - loadRadius; gy <= camGridY + loadRadius; gy++) {
+                    for (let gz = camGridZ - loadRadius; gz <= camGridZ + loadRadius; gz++) {
+                        const key = `${gx},${gy},${gz}`;
+                        shouldExist.add(key);
                         
-                        // Pick a random project for this position
+                        // Skip if already exists
+                        if (sphereCache.has(key)) continue;
+                        
+                        // Pick a random project
                         const project = projects[Math.floor(Math.random() * projects.length)];
                         if (!project || !project.logo) continue;
                         
@@ -360,20 +382,21 @@
                                 
                                 const sphere = new THREE.Mesh(geometry, material);
                                 
-                                // Position in grid with some randomness
-                                sphere.position.x = gx * spacing + (Math.random() - 0.5) * 10;
-                                sphere.position.y = gy * spacing + (Math.random() - 0.5) * 10;
-                                sphere.position.z = gz * spacing + (Math.random() - 0.5) * 10;
+                                // Position at grid point with randomness
+                                sphere.position.x = gx * gridSpacing + (Math.random() - 0.5) * 20;
+                                sphere.position.y = gy * gridSpacing + (Math.random() - 0.5) * 20;
+                                sphere.position.z = gz * gridSpacing + (Math.random() - 0.5) * 20;
                                 
                                 sphere.userData = {
                                     project: project,
                                     rotationSpeed: 0.005 + Math.random() * 0.01,
                                     originalPosition: sphere.position.clone(),
-                                    gridPos: { x: gx, y: gy, z: gz }
+                                    gridKey: key
                                 };
                                 
                                 scene.add(sphere);
                                 logoSpheres.push(sphere);
+                                sphereCache.set(key, sphere);
                             },
                             undefined,
                             (error) => console.log('Logo load error:', error)
@@ -382,8 +405,24 @@
                 }
             }
             
-            document.getElementById('loading').style.display = 'none';
+            // Remove spheres that are too far away
+            sphereCache.forEach((sphere, key) => {
+                if (!shouldExist.has(key)) {
+                    scene.remove(sphere);
+                    if (sphere.geometry) sphere.geometry.dispose();
+                    if (sphere.material) {
+                        if (sphere.material.map) sphere.material.map.dispose();
+                        sphere.material.dispose();
+                    }
+                    sphereCache.delete(key);
+                    const index = logoSpheres.indexOf(sphere);
+                    if (index > -1) logoSpheres.splice(index, 1);
+                }
+            });
         }
+
+        // Track last camera position for updates
+        let lastCameraGridPos = { x: 0, y: 0, z: 0 };
 
         // Mouse controls for camera rotation and movement
         let mouseX = 0;
@@ -612,6 +651,18 @@
                 const right = new THREE.Vector3();
                 right.crossVectors(cameraDirection, camera.up).normalize();
                 camera.position.add(right.multiplyScalar(movement.speed));
+            }
+            
+            // Update projects around camera when moving to new grid cell
+            const currentGridX = Math.floor(camera.position.x / gridSpacing);
+            const currentGridY = Math.floor(camera.position.y / gridSpacing);
+            const currentGridZ = Math.floor(camera.position.z / gridSpacing);
+            
+            if (currentGridX !== lastCameraGridPos.x || 
+                currentGridY !== lastCameraGridPos.y || 
+                currentGridZ !== lastCameraGridPos.z) {
+                updateProjectsAroundCamera();
+                lastCameraGridPos = { x: currentGridX, y: currentGridY, z: currentGridZ };
             }
             
             // Remove automatic mouse tracking - full manual control only
