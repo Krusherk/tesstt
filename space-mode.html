@@ -361,13 +361,13 @@
                         
                         const sphere = new THREE.Mesh(geometry, material);
                         
-                        // Position spheres in a tighter spiral path through space
+                        // Position spheres much closer - starting right in front of camera
                         const spiralIndex = index;
                         const angle = spiralIndex * 0.8;
-                        const distance = 15 + spiralIndex * 3;
+                        const distance = 8 + spiralIndex * 2; // Much closer start (8 instead of 15) and tighter spacing (2 instead of 3)
                         
                         sphere.position.x = Math.cos(angle) * distance;
-                        sphere.position.y = (spiralIndex - allProjects.length / 2) * 5;
+                        sphere.position.y = (spiralIndex - allProjects.length / 2) * 3; // Reduced from 5 to 3
                         sphere.position.z = -Math.sin(angle) * distance;
                         
                         sphere.userData = {
