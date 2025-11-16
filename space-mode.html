@@ -277,23 +277,28 @@
 
         camera.position.z = 5;
 
-        // Create starfield
+        // Create infinite starfield that follows camera
         const starGeometry = new THREE.BufferGeometry();
-        const starCount = 5000;
+        const starCount = 10000; // More stars for better coverage
         const starPositions = new Float32Array(starCount * 3);
         
         for (let i = 0; i < starCount * 3; i += 3) {
-            starPositions[i] = (Math.random() - 0.5) * 200;
-            starPositions[i + 1] = (Math.random() - 0.5) * 200;
-            starPositions[i + 2] = (Math.random() - 0.5) * 200;
+            // Distribute stars in a larger sphere around origin
+            const radius = 500 + Math.random() * 500;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            
+            starPositions[i] = radius * Math.sin(phi) * Math.cos(theta);
+            starPositions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+            starPositions[i + 2] = radius * Math.cos(phi);
         }
         
         starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
         const starMaterial = new THREE.PointsMaterial({ 
             color: 0xffffff, 
-            size: 0.1,
+            size: 0.8,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.9
         });
         const stars = new THREE.Points(starGeometry, starMaterial);
         scene.add(stars);
@@ -631,6 +636,9 @@
             
             // Rotate stars slowly
             stars.rotation.y += 0.0002;
+            
+            // Make stars follow camera for infinite effect
+            stars.position.copy(camera.position);
             
             // Handle movement
             const cameraDirection = new THREE.Vector3();
