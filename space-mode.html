@@ -254,6 +254,9 @@
             top: 40px;
             right: 40px;
             z-index: 200;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .audio-btn {
@@ -280,6 +283,17 @@
 
         .audio-btn.muted {
             color: rgba(255, 255, 255, 0.4);
+        }
+
+        .audio-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            font-weight: 500;
+            background: rgba(15, 15, 15, 0.9);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            backdrop-filter: blur(10px);
         }
 
         .search-results {
@@ -395,12 +409,15 @@
         }
 
         function updateAudioIcon() {
+            const audioLabel = document.getElementById('audioLabel');
             if (isMuted || bgMusic.paused) {
                 audioIcon.textContent = '🔇';
                 audioBtn.classList.add('muted');
+                audioLabel.textContent = 'Turn on sound';
             } else {
                 audioIcon.textContent = '🔊';
                 audioBtn.classList.remove('muted');
+                audioLabel.textContent = 'Turn off sound';
             }
         }
 
