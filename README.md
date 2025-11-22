@@ -34,3 +34,7 @@ Frontend: HTML5, CSS3, JavaScript ES6+
 3D Graphics: Three.js r128
 Database: Firebase Realtime Database
 Typography: Google Fonts (Inter)
+
+# Chill Music 
+
+Toggle on/off with the 🔊/🔇 button (bottom-left on homepage, top-right on space mode)
