@@ -249,7 +249,6 @@
             z-index: 50;
         }
 
-/* Audio Control Button */
         .audio-control {
             position: fixed;
             top: 40px;
@@ -282,15 +281,28 @@
         .audio-btn.muted {
             color: rgba(255, 255, 255, 0.4);
         }
+
+        .search-results {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            background: rgba(15, 15, 15, 0.8);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <!-- Background Audio -->
     <audio id="bgMusic" loop>
         <source src="sign-in-loop.mp3" type="audio/mpeg">
     </audio>
 
-    <!-- Audio Control Button -->
     <div class="audio-control">
         <button class="audio-btn" id="audioBtn" title="Toggle Music">
             <span id="audioIcon">🔊</span>
@@ -302,6 +314,8 @@
     <div class="search-bar">
         <input type="text" class="search-input" id="searchInput" placeholder="Search projects in space...">
     </div>
+    
+    <div class="search-results" id="searchResults"></div>
     
     <div class="tooltip" id="tooltip">
         <div class="tooltip-header">
@@ -411,7 +425,7 @@
 
         camera.position.z = 5;
 
-        // Create infinite starfield that follows camera
+        // Create infinite starfield
         const starGeometry = new THREE.BufferGeometry();
         const starCount = 10000;
         const starPositions = new Float32Array(starCount * 3);
@@ -436,16 +450,45 @@
         const stars = new THREE.Points(starGeometry, starMaterial);
         scene.add(stars);
 
-        // Array to hold project logo spheres
         let logoSpheres = [];
         let projects = [];
         let searchQuery = '';
+        let filteredProjects = [];
 
         // Search functionality
         document.getElementById('searchInput').addEventListener('input', (e) => {
             searchQuery = e.target.value.toLowerCase().trim();
-            createLogoSpheres();
+            filterAndUpdateSpheres();
         });
+
+        function filterAndUpdateSpheres() {
+            if (searchQuery) {
+                filteredProjects = projects.filter(p => {
+                    const matchName = p.name.toLowerCase().includes(searchQuery);
+                    const matchDesc = p.description.toLowerCase().includes(searchQuery);
+                    const categories = Array.isArray(p.categories) ? p.categories : [p.category];
+                    const matchCat = categories.some(cat => cat.toLowerCase().includes(searchQuery));
+                    return matchName || matchDesc || matchCat;
+                });
+                
+                const resultsEl = document.getElementById('searchResults');
+                if (filteredProjects.length > 0) {
+                    resultsEl.textContent = `Found ${filteredProjects.length} project${filteredProjects.length !== 1 ? 's' : ''}`;
+                    resultsEl.style.display = 'block';
+                } else {
+                    resultsEl.textContent = 'No projects found';
+                    resultsEl.style.display = 'block';
+                }
+            } else {
+                filteredProjects = [...projects];
+                document.getElementById('searchResults').style.display = 'none';
+            }
+            
+            // Clear cache and recreate spheres
+            sphereCache.clear();
+            lastCameraGridPos = { x: Infinity, y: Infinity, z: Infinity };
+            updateProjectsAroundCamera();
+        }
 
         // Load projects
         const projectsRef = ref(db, 'projects');
@@ -460,26 +503,11 @@
                     }
                 });
             }
-            createLogoSpheres();
-        });
-
-        function createLogoSpheres() {
-            // Clear existing spheres
-            logoSpheres.forEach(sphere => {
-                scene.remove(sphere);
-                if (sphere.geometry) sphere.geometry.dispose();
-                if (sphere.material) {
-                    if (sphere.material.map) sphere.material.map.dispose();
-                    sphere.material.dispose();
-                }
-            });
-            logoSpheres = [];
-
-            // Create initial spheres around starting position
+            filteredProjects = [...projects];
+            sphereCache.clear();
             updateProjectsAroundCamera();
-            
             document.getElementById('loading').style.display = 'none';
-        }
+        });
 
         // Dynamic sphere management
         const sphereCache = new Map();
@@ -488,19 +516,20 @@
         function updateProjectsAroundCamera() {
             const textureLoader = new THREE.TextureLoader();
             
-            // Filter projects based on search
-            let filteredProjects = projects;
-            if (searchQuery) {
-                filteredProjects = projects.filter(p => {
-                    const matchName = p.name.toLowerCase().includes(searchQuery);
-                    const matchDesc = p.description.toLowerCase().includes(searchQuery);
-                    const categories = Array.isArray(p.categories) ? p.categories : [p.category];
-                    const matchCat = categories.some(cat => cat.toLowerCase().includes(searchQuery));
-                    return matchName || matchDesc || matchCat;
+            if (filteredProjects.length === 0) {
+                // Clear all spheres if no filtered projects
+                logoSpheres.forEach(sphere => {
+                    scene.remove(sphere);
+                    if (sphere.geometry) sphere.geometry.dispose();
+                    if (sphere.material) {
+                        if (sphere.material.map) sphere.material.map.dispose();
+                        sphere.material.dispose();
+                    }
                 });
+                logoSpheres = [];
+                sphereCache.clear();
+                return;
             }
-            
-            if (filteredProjects.length === 0) return;
             
             const camGridX = Math.floor(camera.position.x / gridSpacing);
             const camGridY = Math.floor(camera.position.y / gridSpacing);
@@ -508,6 +537,8 @@
             
             const loadRadius = 3;
             const shouldExist = new Set();
+            
+            let projectIndex = 0;
             
             for (let gx = camGridX - loadRadius; gx <= camGridX + loadRadius; gx++) {
                 for (let gy = camGridY - loadRadius; gy <= camGridY + loadRadius; gy++) {
@@ -517,7 +548,10 @@
                         
                         if (sphereCache.has(key)) continue;
                         
-                        const project = filteredProjects[Math.floor(Math.random() * filteredProjects.length)];
+                        // Use filtered projects in order, cycling through them
+                        const project = filteredProjects[projectIndex % filteredProjects.length];
+                        projectIndex++;
+                        
                         if (!project || !project.logo) continue;
                         
                         const geometry = new THREE.SphereGeometry(4.5, 32, 32);
@@ -556,6 +590,7 @@
                 }
             }
             
+            // Remove spheres that should no longer exist
             sphereCache.forEach((sphere, key) => {
                 if (!shouldExist.has(key)) {
                     scene.remove(sphere);
@@ -571,7 +606,7 @@
             });
         }
 
-        let lastCameraGridPos = { x: 0, y: 0, z: 0 };
+        let lastCameraGridPos = { x: Infinity, y: Infinity, z: Infinity };
 
         // Mouse controls
         let mouseX = 0;
